@@ -28,8 +28,8 @@
 
 BIN = boost-img
 
-CFLAGS ?= -O2 -Wall -Werror -std=c99
-LDFLAGS ?=
+CFLAGS  = -O2 -Wall -Werror -std=c99
+LDFLAGS =
 
 LIBS = -lz
 SOURCES = boost.c main.c cmd.c util.c
@@ -38,10 +38,10 @@ HEADERS = boost.h config.h cmd.h util.h
 OBJS = ${SOURCES:.c=.o}
 
 $(BIN): $(OBJS)
-	$(CC) $(LIBS) $(LDFLAGS) -o $@ $^
+	$(CC) $(LIBS) $(LDFLAGS) -o $@ $(OBJS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $^
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
 	rm -f $(OBJS) $(BIN) uImage bcode initrd
