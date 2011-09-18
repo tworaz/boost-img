@@ -167,9 +167,9 @@ boost_split(boost_hdr_t hdr, const uint32_t *img, size_t len, uint32_t tag)
 	size_t kern_size, bcode_size, rdisk_size;
 
 	kern_off = 4;
-	bcode_off = BRANCH_2_OFFSET(img[0]);
+	bcode_off = BRANCH_2_OFFSET(img[0]) - 408;
 	kern_size = bcode_off - kern_off;
-	bcode_size = 644;
+	bcode_size = 1052;
 	rdisk_off = bcode_off + bcode_size;
 	rdisk_size = len - rdisk_off;
 
