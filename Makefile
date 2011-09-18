@@ -44,6 +44,6 @@ $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f $(OBJS) $(BIN) uImage bcode initrd
+	rm -f $(OBJS) $(BIN)
 
 .PHONY = clean all

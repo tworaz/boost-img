@@ -71,8 +71,19 @@ typedef struct boost_header
 	uint32_t	checksum;
 } boost_hdr_t;
 
+typedef struct image_components
+{
+	void	*kernel;
+	size_t	kernel_len;
+	void	*bootcode;
+	size_t	bootcode_len;
+	void	*ramdisk;
+	size_t	ramdisk_len;
+} image_components_t;
+
 void boost_print_info(boost_hdr_t);
 int  boost_extract(boost_hdr_t, void *);
+int  boost_create(const char *, const image_components_t *);
 int  boost_check(boost_hdr_t, const void *);
 
 #endif /* _BOOST_H_ */

@@ -132,6 +132,13 @@ extract_cleanup:
 }
 
 int
+boost_create(const char *outfile, const image_components_t *parts)
+{
+	printf("TODO: implement %s\n", __func__);
+	return 1;
+}
+
+int
 boost_check(boost_hdr_t hdr, const void *data)
 {
 	uint32_t data_crc = 0;

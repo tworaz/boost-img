@@ -42,13 +42,13 @@ print_help(const char *progname)
 	       "Usage: %s [command] [command options]\n\n"
 	       "Command syntax:\n"
 	       "  check filename\n"
-	       "  create [-z] filename kernel initrd bootstrap\n"
+	       "  create [-z] kernel bootcode ramdisk filename\n"
 	       "  extract filename\n"
 	       "  info filename\n\n"
 	       "Command parameters:\n"
 	       "  'filename' netbook pro boost image file\n"
 	       "  'kernel' linux kernel image\n"
-	       "  'initrd' initrd image\n"
+	       "  'ramdisk' linux ramdisk image\n"
 	       "  'bootstrap' low level initialization code\n"
 	       "  '-z' use zlib compression\n",
 	       VERSION_STR, progname);
