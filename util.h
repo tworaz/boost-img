@@ -30,6 +30,9 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
+#include <inttypes.h>
+
+uint32_t swap_bytes_be(uint32_t);
 void *zlib_decompress(const char *data, size_t len, size_t *out_len);
 void *zlib_compress(const char *data, size_t len, size_t *out_len);
 int  write_to_file(const char *data, size_t len, const char *filename);

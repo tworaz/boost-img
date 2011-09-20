@@ -37,6 +37,18 @@
 #include "util.h"
 #include "config.h"
 
+uint32_t swap_bytes_be(uint32_t arg)
+{
+	uint32_t ret;
+	char *bytes = (char *)(&ret);
+
+	bytes[0] = (arg >> 24) & 0xFF;
+	bytes[1] = (arg >> 16) & 0xFF;
+	bytes[2] = (arg >> 8) & 0xFF;
+	bytes[3] = (arg >> 0) & 0xFF;
+
+	return ret;
+}
 
 void *
 zlib_decompress(const char *data, size_t len, size_t *out_len)
@@ -57,14 +69,14 @@ zlib_decompress(const char *data, size_t len, size_t *out_len)
 	if (NULL == out_buf) {
 		fprintf(stderr, "Out of memory while allocating output "
 		        "decompress buffer!\n");
-		goto decompress_fail;
+		goto decompress_failed;
 	}
 	zs.next_out = (Bytef *)out_buf;
 	zs.avail_out = MAX_IMAGE_BUF_SIZE;
 
 	if (Z_STREAM_END != inflate(&zs, Z_FINISH)) {
 		fprintf(stderr, "Zlib decompression failed: %s\n", zs.msg);
-		goto decompress_fail;
+		goto decompress_failed;
 	}
 
 	*out_len = MAX_IMAGE_BUF_SIZE - zs.avail_out;
@@ -85,7 +97,7 @@ zlib_decompress(const char *data, size_t len, size_t *out_len)
 
 	return out_buf;
 
-decompress_fail:
+decompress_failed:
 	if (NULL != out_buf) {
 		free(out_buf);
 	}
@@ -102,7 +114,61 @@ decompress_fail:
 void *
 zlib_compress(const char *data, size_t len, size_t *out_len)
 {
-	fprintf(stderr, "TODO: implement %s\n", __func__);
+	char *out_buf = NULL;
+	char *tmp_ptr = NULL;
+	z_stream zs;
+
+	memset(&zs, 0, sizeof(z_stream));
+	if (Z_OK != deflateInit(&zs, Z_DEFAULT_COMPRESSION)) {
+		fprintf(stderr, "Failed to init zlib compressor!\n");
+		return NULL;
+	}
+	zs.next_in = (Bytef *)data;
+	zs.avail_in = len;
+
+	out_buf = malloc(MAX_IMAGE_BUF_SIZE);
+	if (NULL == out_buf) {
+		fprintf(stderr, "Out of memory while allocating output "
+		                "compression buffer!\n");
+		goto compress_failed;
+	}
+	zs.next_out = (Bytef *)out_buf;
+	zs.avail_out = MAX_IMAGE_BUF_SIZE;
+
+	if (Z_STREAM_END != deflate(&zs, Z_FINISH)) {
+		fprintf(stderr, "Zlib compression failed: %s\n", zs.msg);
+		goto compress_failed;
+	}
+
+	*out_len = MAX_IMAGE_BUF_SIZE - zs.avail_out;
+	if (Z_OK != deflateEnd(&zs)) {
+		fprintf(stderr, "Failed to close zlib compressor!\n");
+	}
+
+	if (MAX_IMAGE_BUF_SIZE == *out_len) {
+		return out_buf;
+	}
+
+	tmp_ptr = realloc(out_buf, *out_len);
+	if (NULL == tmp_ptr) {
+		fprintf(stderr, "Shrinking of output image buffer failed!\n");
+	} else {
+		out_buf = tmp_ptr;
+	}
+
+	return out_buf;
+
+compress_failed:
+	if (NULL != out_buf) {
+		free(out_buf);
+	}
+
+	if (NULL != zs.next_in) {
+		if (Z_OK != deflateEnd(&zs)) {
+			fprintf(stderr, "Failed to close zlib compressor!\n");
+		}
+	}
+
 	return NULL;
 }
 

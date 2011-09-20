@@ -52,6 +52,9 @@
 /* Number of bytes used to calculate header checksum. */
 #define BOOST_HEADER_CRC_BYTES 252
 
+/* Initial bootcode instruction starts at this offset. */
+#define BOOTCODE_START_OFFSET 408
+
 typedef struct boost_header
 {
 	uint32_t	branch_offset;
@@ -80,6 +83,14 @@ typedef struct image_components
 	void	*ramdisk;
 	size_t	ramdisk_len;
 } image_components_t;
+
+typedef struct bootcode_cfg
+{
+	uint32_t 	jump_addr;
+	uint32_t 	reserved;
+	uint32_t 	ramdisk_end;
+	uint32_t 	ramdisk_start;
+} bootcode_cfg_t;
 
 void boost_print_info(boost_hdr_t);
 int  boost_extract(boost_hdr_t, void *);

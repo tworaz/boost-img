@@ -38,12 +38,17 @@
 #define IS_ARM_BRANCH(ins) (((ins) & (0xea << 24)) | \
                             ((ins) & (0xeb << 24)))
 
-#define BRANCH_2_OFFSET(br) (((br & 0x00ffffff) << 2) + 8)
-#define OFFSET_2_BRANCH(off) ((0xea << 24) | \
+#define BRANCH_2_OFFSET(br) (((br & 0x00ffffff) << 2) - 248)
+
+#define OFFSET_2_BRANCHL(off) ((0xeb << 24) | \
 	(((off - 8) >> 2) & 0x00ffffff))
 
+#define OFFSET_2_BRANCH(off) ((0xea << 24) | \
+	(((off + 248) >> 2) & 0x00ffffff))
+
 /* Forward declarations of local functions */
-int boost_split(boost_hdr_t hdr, const uint32_t *img, size_t len, uint32_t tag);
+int  boost_split(boost_hdr_t hdr, const uint32_t *img, size_t len);
+void boost_init_header(boost_hdr_t *hdr, const uint32_t *data, size_t data_len);
 
 void
 boost_print_info(boost_hdr_t hdr)
@@ -87,15 +92,12 @@ int
 boost_extract(boost_hdr_t hdr, void *data)
 {
 	uint32_t first_instr = 0;
-	uint32_t tag;
 	size_t len = 0;
 	int rv = 0;
 
 	if (0 != boost_check(hdr, data)) {
 		return 1;
 	}
-
-	tag = ((uint32_t *)data)[0];
 
 	if (hdr.flags & BOOST_FLAG_ZLIB) {
 		// Actual zlib stream begins 4 bytes into the data section
@@ -110,7 +112,7 @@ boost_extract(boost_hdr_t hdr, void *data)
 
 	first_instr = ((uint32_t *)(data))[0];
 	if (IS_ARM_BRANCH(first_instr)) {
-		if (0 != boost_split(hdr, data, len, tag)) {
+		if (0 != boost_split(hdr, data, len)) {
 			rv = 1;
 		}
 	} else {
@@ -134,8 +136,101 @@ extract_cleanup:
 int
 boost_create(const char *outfile, const image_components_t *parts)
 {
-	printf("TODO: implement %s\n", __func__);
-	return 1;
+	uint32_t *image_buf = NULL, *copy_ptr = NULL, *image_data = NULL;
+	boost_hdr_t *boost_hdr;
+	bootcode_cfg_t *bcode_cfg = NULL;
+	void *zlib_data = NULL;
+	size_t zlib_data_len;
+	uint32_t branch_offset;
+	size_t buf_len, payload_len;
+	int rv = 1;
+
+	buf_len = parts->kernel_len + parts->bootcode_len + parts->ramdisk_len;
+	buf_len += 4; /* Initial branch instruction */
+	payload_len = buf_len;
+
+	image_buf = malloc(buf_len);
+	if (NULL == image_buf) {
+		fprintf(stderr, "Failed to allocate output buffer!\n");
+		return 1;
+	}
+
+	branch_offset = parts->kernel_len + 4 + BOOTCODE_START_OFFSET;
+	image_buf[0] = OFFSET_2_BRANCHL(branch_offset);
+
+	copy_ptr = image_buf + 1;
+	memcpy(copy_ptr, parts->kernel, parts->kernel_len);
+
+	copy_ptr += (parts->kernel_len / 4);
+	memcpy(copy_ptr, parts->bootcode, parts->bootcode_len);
+
+	copy_ptr += (parts->bootcode_len / 4);
+	bcode_cfg = (bootcode_cfg_t *)(copy_ptr - sizeof(bootcode_cfg_t)/4);
+	memcpy(copy_ptr, parts->ramdisk, parts->ramdisk_len);
+
+	/* Set bootcode configuration fields. */
+	bcode_cfg->jump_addr = branch_offset - 4;
+	bcode_cfg->ramdisk_start = 4 + parts->kernel_len + parts->bootcode_len;
+	bcode_cfg->ramdisk_end = bcode_cfg->ramdisk_start + parts->ramdisk_len;
+
+#if 0
+	if (0 != write_to_file((char *)image_buf, buf_len, "payload.bin")) {
+		fprintf(stderr, "Failed to write payload.bin!\n");
+		goto create_failed;
+	}
+#endif
+
+	zlib_data = zlib_compress((char *)image_buf, buf_len, &zlib_data_len);
+	if (NULL == zlib_data) {
+		fprintf(stderr, "Failed to compress image!\n");
+		goto create_failed;
+	}
+
+	free(image_buf);
+	image_buf = NULL;
+	copy_ptr = NULL;
+	bcode_cfg = NULL;
+
+#if 0
+	if (0 != write_to_file((char *)zlib_data, zlib_data_len, "payload.zlib")) {
+		fprintf(stderr, "Failed to write payload.zlib!\n");
+		goto create_failed;
+	}
+#endif
+
+	buf_len = zlib_data_len + sizeof(boost_hdr_t) + 4;
+	image_buf = malloc(buf_len);
+	if (NULL == image_buf) {
+		fprintf(stderr, "Failed to allocate output buffer!\n");
+		goto create_failed;
+	}
+
+	boost_hdr = (boost_hdr_t *)image_buf;
+	image_data = image_buf + sizeof(boost_hdr_t)/4;
+	image_data[0] = swap_bytes_be(payload_len);
+	memcpy(image_data + 1, zlib_data, zlib_data_len);
+
+	free(zlib_data);
+	zlib_data = NULL;
+
+	boost_init_header(boost_hdr, image_data, buf_len - sizeof(boost_hdr_t));
+
+	if (0 != write_to_file((char *)image_buf, buf_len, outfile)) {
+		fprintf(stderr, "Failed to write %s\n", outfile);
+		goto create_failed;
+	}
+
+	rv = 0;
+
+create_failed:
+	if (NULL != image_buf) {
+		free(image_buf);
+	}
+	if (NULL != zlib_data) {
+		free(zlib_data);
+	}
+
+	return rv;
 }
 
 int
@@ -168,13 +263,13 @@ boost_check(boost_hdr_t hdr, const void *data)
 }
 
 int
-boost_split(boost_hdr_t hdr, const uint32_t *img, size_t len, uint32_t tag)
+boost_split(boost_hdr_t hdr, const uint32_t *img, size_t len)
 {
 	uint32_t kern_off, bcode_off, rdisk_off;
 	size_t kern_size, bcode_size, rdisk_size;
 
 	kern_off = 4;
-	bcode_off = BRANCH_2_OFFSET(img[0]) - 408;
+	bcode_off = BRANCH_2_OFFSET(img[0]) - BOOTCODE_START_OFFSET;
 	kern_size = bcode_off - kern_off;
 	bcode_size = 1052;
 	rdisk_off = bcode_off + bcode_size;
@@ -205,4 +300,25 @@ boost_split(boost_hdr_t hdr, const uint32_t *img, size_t len, uint32_t tag)
 	printf("Writing initrd\t: OK\n");
 
 	return 0;
+}
+
+void boost_init_header(boost_hdr_t *hdr, const uint32_t *data, size_t data_len)
+{
+	memset(hdr, 0, sizeof(boost_hdr_t));
+
+	hdr->branch_offset = OFFSET_2_BRANCH(0);
+	hdr->image_size = data_len;
+	hdr->image_checksum = cksum((char *)data, data_len);
+	hdr->load_offset = 0x00408000;
+
+	hdr->flags |= BOOST_FLAG_RAM_IMG;
+	hdr->flags |= BOOST_FLAG_NO_HDR;
+	hdr->flags |= BOOST_FLAG_ZLIB;
+
+	memcpy(&(hdr->platform_id), "nBk2", 4);
+	memcpy(hdr->target_filename, "nBkProOs.img", 12);
+	memcpy(hdr->image_name, "NETBOOKPRO Linux26", 18);
+	memcpy(hdr->image_version_string, "K123m", 5);
+
+	hdr->checksum = cksum((const char *)hdr, BOOST_HEADER_CRC_BYTES);
 }
