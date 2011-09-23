@@ -130,8 +130,8 @@ cmd_create(const char *kernel, const char *bootcode, const char *ramdisk,
 
 	components.kernel = k_addr;
 	components.kernel_len = k_stat.st_size;
-	components.bootcode = b_addr;
-	components.bootcode_len = b_stat.st_size;
+	components.bcode = b_addr;
+	components.bcode_len = b_stat.st_size;
 	components.ramdisk = r_addr;
 	components.ramdisk_len = r_stat.st_size;
 

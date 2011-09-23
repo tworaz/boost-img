@@ -52,8 +52,22 @@
 /* Number of bytes used to calculate header checksum. */
 #define BOOST_HEADER_CRC_BYTES 252
 
-/* Initial bootcode instruction starts at this offset. */
-#define BOOTCODE_START_OFFSET 408
+/* Initial legacy bootcode instruction starts at this offset. */
+#define LEGACY_BCODE_START_OFFSET	408
+/* Size of boot code used in original Psion images */
+#define LEGACY_BCODE_SIZE		1052
+
+/*
+ * First four bytes of the new boot code contain some usefull info.
+ * In general it looks like 0xMMMMMVVV, where
+ * - AAAAA is the MAGIC number identifying the bootcode.
+ * - VVV is the version number.
+ */
+#define BCODE_MAGIC 		0xBC0DE000
+#define BCODE_MAGIC_MASK	0xfffff000
+#define BCODE_VERSION_MASK	0x00000fff
+
+#define STARTUP_BYTES		16
 
 typedef struct boost_header
 {
@@ -76,21 +90,21 @@ typedef struct boost_header
 
 typedef struct image_components
 {
-	void	*kernel;
-	size_t	kernel_len;
-	void	*bootcode;
-	size_t	bootcode_len;
-	void	*ramdisk;
-	size_t	ramdisk_len;
+	uint32_t	*kernel;
+	size_t		kernel_len;
+	uint32_t	*bcode;
+	size_t		bcode_len;
+	uint32_t	*ramdisk;
+	size_t		ramdisk_len;
 } image_components_t;
 
-typedef struct bootcode_cfg
+typedef struct bcode_header
 {
-	uint32_t 	jump_addr;
-	uint32_t 	reserved;
-	uint32_t 	ramdisk_end;
-	uint32_t 	ramdisk_start;
-} bootcode_cfg_t;
+	uint32_t	magic;
+	uint32_t	bcode_off;
+	uint32_t	ramdisk_size;
+	uint32_t	reserved;
+} bcode_hdr_t;
 
 void boost_print_info(boost_hdr_t);
 int  boost_extract(boost_hdr_t, void *);
