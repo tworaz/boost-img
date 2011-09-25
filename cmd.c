@@ -72,7 +72,7 @@ int
 cmd_create(const char *kernel, const char *bootcode, const char *ramdisk,
            const char *outfile, bool use_zlib)
 {
-	void *k_addr = NULL, *b_addr = NULL, *r_addr = NULL;
+	void *k_addr = MAP_FAILED, *b_addr = MAP_FAILED, *r_addr = MAP_FAILED;
 	int k_fd = -1, b_fd = -1, r_rd = -1;
 	struct stat k_stat, b_stat, r_stat;
 	image_components_t components;
