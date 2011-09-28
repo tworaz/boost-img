@@ -357,7 +357,7 @@ void boost_init_header(boost_hdr_t *hdr, const uint32_t *data, size_t data_len)
 	hdr->branch_offset = OFFSET_2_BRANCH(0);
 	hdr->image_size = data_len;
 	hdr->image_checksum = cksum((char *)data, data_len);
-	hdr->load_offset = 0x00408000;
+	hdr->load_offset = 0x00208000;
 
 	hdr->flags |= BOOST_FLAG_RAM_IMG;
 	hdr->flags |= BOOST_FLAG_NO_HDR;
@@ -365,8 +365,8 @@ void boost_init_header(boost_hdr_t *hdr, const uint32_t *data, size_t data_len)
 
 	memcpy(&(hdr->platform_id), "nBk2", 4);
 	memcpy(hdr->target_filename, "nBkProOs.img", 12);
-	memcpy(hdr->image_name, "NETBOOKPRO Linux26", 18);
-	memcpy(hdr->image_version_string, "T667a", 5);
+	memcpy(hdr->image_name, "NetBook Pro Linux 3.1", 19);
+	memcpy(hdr->image_version_string, "X001", 5);
 
 	hdr->checksum = cksum((const char *)hdr, BOOST_HEADER_CRC_BYTES);
 }
