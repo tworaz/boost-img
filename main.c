@@ -27,8 +27,10 @@
  * SUCH DAMAGE.
  */
 
-#include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
+#include <limits.h>
+#include <errno.h>
 #include <stdio.h>
 
 #include "cmd.h"
@@ -42,21 +44,79 @@ print_help(const char *progname)
 	       "Usage: %s [command] [command options]\n\n"
 	       "Command syntax:\n"
 	       "  check filename\n"
-	       "  create [-z] kernel bootcode ramdisk filename\n"
+               "  create [create args]\n"
 	       "  extract filename\n"
 	       "  info filename\n\n"
-	       "Command parameters:\n"
-	       "  'filename' netbook pro boost image file\n"
-	       "  'kernel' linux kernel image\n"
-	       "  'ramdisk' linux ramdisk image\n"
-	       "  'bootstrap' low level initialization code\n"
-	       "  '-z' use zlib compression\n",
+	       "Possible create paramaters:\n"
+	       "  -k kernel, path to kernel image\n"
+	       "  -b bootcode, path to boot code binary\n"
+	       "  -r ramdisk, path to ramdisk image\n"
+	       "  -o outfile, name of the output image\n"
+	       "  -d descr, image description\n"
+	       "  -v version, image version string\n"
+	       "  -l offset, memory load offset\n"
+	       "  -z, use zlib compression\n",
 	       VERSION_STR, progname);
+}
+
+int
+parse_create_args(int argc, char *argv[], create_args_t *args)
+{
+	int i;
+
+	for (i = 2; i < argc; i++) {
+		if ((0 == strncmp(argv[i], "-k", 2)) && (++i < argc)) {
+			args->kernel = argv[i];
+		} else if ((0 == strncmp(argv[i], "-b", 2)) && (++i < argc)) {
+			args->bcode = argv[i];
+		} else if ((0 == strncmp(argv[i], "-r", 2)) && (++i < argc)) {
+			args->ramdisk = argv[i];
+		} else if ((0 == strncmp(argv[i], "-o", 2)) && (++i < argc)) {
+			args->outfile = argv[i];
+		} else if ((0 == strncmp(argv[i], "-d", 2)) && (++i < argc)) {
+			args->image_descr = argv[i];
+		} else if ((0 == strncmp(argv[i], "-v", 2)) && (++i < argc)) {
+			args->image_version = argv[i];
+		} else if ((0 == strncmp(argv[i], "-l", 2)) && (++i < argc)) {
+			errno = 0;
+			args->load_offset = strtol(argv[i], (char **)NULL, 16);
+			if (errno != 0) {
+				printf("Invalid load offset specified!\n");
+				return 1;
+			}
+		} else if (0 == strncmp(argv[i], "-z", 2)) {
+			args->use_zlib = 1;
+		} else {
+			printf("Invalid create arguments!\n");
+			return 1;
+		}
+	}
+
+	if (args->kernel == NULL) {
+		printf("Kernel path has to be specified!\n");
+		return 1;
+	}
+	if (args->outfile == NULL) {
+		args->outfile = DEFAULT_BOOST_IMG_NAME;
+	}
+	if (args->image_descr == NULL) {
+		args->image_descr = DEFAULT_BOOST_IMG_DESCR;
+	}
+	if (args->image_version == NULL) {
+		args->image_version = DEFAULT_BOOST_IMG_VER;
+	}
+	if (args->load_offset == 0) {
+		args->load_offset = DEFAULT_IMG_LOAD_OFFSET;
+	}
+
+	return 0;
 }
 
 int
 main(int argc, char *argv[])
 {
+	create_args_t create_args;
+
 	if (argc < 3) {
 		print_help(argv[0]);
 		return 1;
@@ -69,21 +129,12 @@ main(int argc, char *argv[])
 	} else if (0 == strncmp(argv[1], "check", 5)) {
 		return cmd_check(argv[2]);
 	} else if (0 == strncmp(argv[1], "create", 6)) {
-		if (0 == strncmp(argv[2], "-z", 2)) {
-			if (argc < 7) {
-				print_help(argv[0]);
-				return 1;
-			}
-			return cmd_create(argv[3], argv[4], argv[5],
-			                  argv[6], true);
-		} else {
-			if (argc < 6) {
-				print_help(argv[0]);
-				return 1;
-			}
-			return cmd_create(argv[2], argv[3], argv[4],
-			                  argv[5], false);
+		memset(&create_args, 0, sizeof(create_args_t));
+		if (parse_create_args(argc, argv, &create_args)) {
+			print_help(argv[0]);
+			return 1;
 		}
+		return cmd_create(&create_args);
 	} else {
 		print_help(argv[0]);
 		return 1;

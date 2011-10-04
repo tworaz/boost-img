@@ -69,73 +69,81 @@ info_fail:
 }
 
 int
-cmd_create(const char *kernel, const char *bootcode, const char *ramdisk,
-           const char *outfile, bool use_zlib)
+cmd_create(create_args_t *args)
 {
 	void *k_addr = MAP_FAILED, *b_addr = MAP_FAILED, *r_addr = MAP_FAILED;
 	int k_fd = -1, b_fd = -1, r_rd = -1;
 	struct stat k_stat, b_stat, r_stat;
-	image_components_t components;
+	image_create_args_t components;
 	int rv = 1;
 
 	memset(&k_stat, 0, sizeof(struct stat));
 	memset(&b_stat, 0, sizeof(struct stat));
 	memset(&r_stat, 0, sizeof(struct stat));
-	memset(&components, 0, sizeof(image_components_t));
+	memset(&components, 0, sizeof(image_create_args_t));
 
-	k_fd = open(kernel, O_RDONLY);
+	k_fd = open(args->kernel, O_RDONLY);
 	if (-1 == k_fd) {
 		perror("Failed to open kernel file");
 		return 1;
 	}
-	b_fd = open(bootcode, O_RDONLY);
-	if (-1 == b_fd) {
-		perror("Failed to open bootcode file");
-		goto create_fail;
-	}
-	r_rd = open(ramdisk, O_RDONLY);
-	if (-1 == r_rd) {
-		perror("Failed to open ramdisk file");
-		goto create_fail;
-	}
-
 	if (0 != fstat(k_fd, &k_stat)) {
 		perror("Failed to read kernel stat");
 		goto create_fail;
 	}
-	if (0 != fstat(b_fd, &b_stat)) {
-		perror("Failed to read bootcode stat");
-		goto create_fail;
-	}
-	if (0 != fstat(r_rd, &r_stat)) {
-		perror("Failed to read ramdisk stat");
-		goto create_fail;
-	}
-
 	k_addr = mmap(NULL, k_stat.st_size, PROT_READ, MAP_PRIVATE, k_fd, 0);
 	if (MAP_FAILED == k_addr) {
 		perror("Failed to memory map kernel file");
 		goto create_fail;
 	}
-	b_addr = mmap(NULL, b_stat.st_size, PROT_READ, MAP_PRIVATE, b_fd, 0);
-	if (MAP_FAILED == b_addr) {
-		perror("Failed to memory map bootcode file");
-		goto create_fail;
-	}
-	r_addr = mmap(NULL, r_stat.st_size, PROT_READ, MAP_PRIVATE, r_rd, 0);
-	if (MAP_FAILED == r_addr) {
-		perror("Failed to memory map ramdisk file");
-		goto create_fail;
-	}
-
 	components.kernel = k_addr;
 	components.kernel_len = k_stat.st_size;
-	components.bcode = b_addr;
-	components.bcode_len = b_stat.st_size;
-	components.ramdisk = r_addr;
-	components.ramdisk_len = r_stat.st_size;
 
-	rv = boost_create(outfile, &components);
+	if (args->bcode) {
+		b_fd = open(args->bcode, O_RDONLY);
+		if (-1 == b_fd) {
+			perror("Failed to open bootcode file");
+			goto create_fail;
+		}
+		if (0 != fstat(b_fd, &b_stat)) {
+			perror("Failed to read bootcode stat");
+			goto create_fail;
+		}
+		b_addr = mmap(NULL, b_stat.st_size, PROT_READ, MAP_PRIVATE, b_fd, 0);
+		if (MAP_FAILED == b_addr) {
+			perror("Failed to memory map bootcode file");
+			goto create_fail;
+		}
+		components.bcode = b_addr;
+		components.bcode_len = b_stat.st_size;
+	}
+
+	if (args->ramdisk) {
+		r_rd = open(args->ramdisk, O_RDONLY);
+		if (-1 == r_rd) {
+			perror("Failed to open ramdisk file");
+			goto create_fail;
+		}
+		if (0 != fstat(r_rd, &r_stat)) {
+			perror("Failed to read ramdisk stat");
+			goto create_fail;
+		}
+		r_addr = mmap(NULL, r_stat.st_size, PROT_READ, MAP_PRIVATE, r_rd, 0);
+		if (MAP_FAILED == r_addr) {
+			perror("Failed to memory map ramdisk file");
+			goto create_fail;
+		}
+
+		components.ramdisk = r_addr;
+		components.ramdisk_len = r_stat.st_size;
+	}
+
+	components.use_zlib = args->use_zlib;
+	components.load_offset = args->load_offset;
+	components.image_descr = args->image_descr;
+	components.image_version = args->image_version;
+
+	rv = boost_create(args->outfile, &components);
 
 create_fail:
 	if (MAP_FAILED != k_addr) {

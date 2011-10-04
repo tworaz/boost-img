@@ -30,10 +30,22 @@
 #ifndef _CMD_H_
 #define _CMD_H_
 
-#include <stdbool.h>
+#include <stdint.h>
+
+typedef struct _create_args
+{
+	const char	*kernel;
+	const char	*bcode;
+	const char	*ramdisk;
+	const char	*outfile;
+	const char	*image_descr;
+	const char	*image_version;
+	uint32_t	load_offset;
+	int		use_zlib;
+} create_args_t;
 
 int cmd_info(const char *);
-int cmd_create(const char *, const char *, const char *, const char *, bool);
+int cmd_create(create_args_t *);
 int cmd_extract(const char *);
 int cmd_check(const char *);
 

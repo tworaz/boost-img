@@ -204,9 +204,9 @@ write_to_file(const char *data, size_t len, const char *filename)
 	return rv;
 }
 
-unsigned cksum(const char * buf, size_t len)
+uint32_t cksum(const char * buf, size_t len)
 {
-	static unsigned const crctab[]={
+	static uint32_t const crctab[]={
 		0x00000000,0x04C11DB7,0x09823B6E,0x0D4326D9,
 		0x130476DC,0x17C56B6B,0x1A864DB2,0x1E475005,
 		0x2608EDB8,0x22C9F00F,0x2F8AD6D6,0x2B4BCB61,
@@ -272,7 +272,7 @@ unsigned cksum(const char * buf, size_t len)
 		0xAFB010B1,0xAB710D06,0xA6322BDF,0xA2F33668,
 		0xBCB4666D,0xB8757BDA,0xB5365D03,0xB1F740B4
 	};
-	unsigned crc;
+	uint32_t crc;
 	size_t i;
 
 	for (crc=0,i=0; i<len; i++) {

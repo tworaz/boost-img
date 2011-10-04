@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -48,11 +47,13 @@
 #define BRANCH_2_OFFSET(br) (((br & 0x00ffffff) << 2) - 248)
 
 /* Forward declarations of local functions */
+int  boost_create_adv(const char *, const image_create_args_t *);
+int  boost_create_simple(const char *, const image_create_args_t *);
 int  boost_extract_new(const uint32_t *, size_t);
 int  boost_extract_legacy(const uint32_t *, size_t);
-void boost_init_header(boost_hdr_t *hdr, const uint32_t *data, size_t data_len);
-bool boost_is_legacy(const boost_hdr_t *hdr);
-bool bcode_check(uint32_t);
+void boost_setup_header(boost_hdr_t *, const uint32_t *, size_t, const image_create_args_t *);
+int  boost_is_legacy(const boost_hdr_t *hdr);
+int  bcode_check(uint32_t);
 
 void
 boost_print_info(boost_hdr_t hdr)
@@ -70,8 +71,8 @@ boost_print_info(boost_hdr_t hdr)
 	printf("  Header checksum: %u\n", hdr.checksum);
 	printf("  Image:\n");
 	printf("    * ID:          %u\n", hdr.image_id);
-	printf("    * Name:        %s\n", hdr.image_name);
-	printf("    * Version:     %s\n", hdr.image_version_string);
+	printf("    * Description: %s\n", hdr.image_description);
+	printf("    * Version:     %s\n", hdr.image_version);
 	printf("    * Size:        %u\n", hdr.image_size);
 	printf("    * Checksum:    %u\n", hdr.image_checksum);
 
@@ -139,7 +140,19 @@ extract_cleanup:
 	return rv;
 }
 
-int boost_create(const char *outfile, const image_components_t *parts)
+int boost_create(const char *outfile, const image_create_args_t *cargs)
+{
+	if (cargs->kernel && cargs->bcode) {
+		return boost_create_adv(outfile, cargs);
+	} else if (cargs->kernel && !cargs->bcode && !cargs->ramdisk) {
+		return boost_create_simple(outfile, cargs);
+	} else {
+		fprintf(stderr, "Unsupported input arguments combination!\n");
+		return 1;
+	}
+}
+
+int boost_create_adv(const char *outfile, const image_create_args_t *cargs)
 {
 	uint32_t *image_buf = NULL, *copy_ptr = NULL, *image_data = NULL;
 	boost_hdr_t *boost_hdr = NULL;
@@ -150,11 +163,11 @@ int boost_create(const char *outfile, const image_components_t *parts)
 	uint32_t branch_offset;
 	int rv = 1;
 
-	if (false == bcode_check(parts->bcode[0])) {
+	if (0 == bcode_check(cargs->bcode[0])) {
 		return 1;
 	}
 
-	buf_len = parts->kernel_len + parts->bcode_len + parts->ramdisk_len;
+	buf_len = cargs->kernel_len + cargs->bcode_len + cargs->ramdisk_len;
 	buf_len += STARTUP_BYTES; /* Initial branch instruction */
 	payload_len = buf_len;
 
@@ -164,22 +177,23 @@ int boost_create(const char *outfile, const image_components_t *parts)
 		return 1;
 	}
 
-	branch_offset = STARTUP_BYTES + parts->kernel_len + sizeof(bcode_hdr_t);
+	branch_offset = STARTUP_BYTES + cargs->kernel_len + sizeof(bcode_hdr_t);
 	image_buf[0] = OFFSET_2_BRANCHL(branch_offset);
 
 	copy_ptr = image_buf + STARTUP_BYTES / sizeof(uint32_t);
-	memcpy(copy_ptr, parts->kernel, parts->kernel_len);
+	memcpy(copy_ptr, cargs->kernel, cargs->kernel_len);
 
-	copy_ptr += (parts->kernel_len / sizeof(uint32_t));
+	copy_ptr += (cargs->kernel_len / sizeof(uint32_t));
 	bcode_hdr = (bcode_hdr_t *)(copy_ptr);
-	memcpy(copy_ptr, parts->bcode, parts->bcode_len);
+	memcpy(copy_ptr, cargs->bcode, cargs->bcode_len);
 
-	copy_ptr += (parts->bcode_len / sizeof(uint32_t));
-	memcpy(copy_ptr, parts->ramdisk, parts->ramdisk_len);
+	copy_ptr += (cargs->bcode_len / sizeof(uint32_t));
+	if (NULL != cargs->ramdisk)
+		memcpy(copy_ptr, cargs->ramdisk, cargs->ramdisk_len);
 
 	/* Set bootcode configuration fields. */
 	bcode_hdr->bcode_off = branch_offset - sizeof(bcode_hdr_t);
-	bcode_hdr->ramdisk_size = parts->ramdisk_len;
+	bcode_hdr->ramdisk_size = cargs->ramdisk_len;
 #if 0
 	if (0 != write_to_file((char *)image_buf, buf_len, "payload.bin")) {
 		fprintf(stderr, "Failed to write payload.bin!\n");
@@ -217,7 +231,7 @@ int boost_create(const char *outfile, const image_components_t *parts)
 	free(zlib_data);
 	zlib_data = NULL;
 
-	boost_init_header(boost_hdr, image_data, buf_len - sizeof(boost_hdr_t));
+	boost_setup_header(boost_hdr, image_data, buf_len - sizeof(boost_hdr_t), cargs);
 
 	if (0 != write_to_file((char *)image_buf, buf_len, outfile)) {
 		fprintf(stderr, "Failed to write %s\n", outfile);
@@ -232,6 +246,65 @@ create_failed:
 	}
 	if (NULL != zlib_data) {
 		free(zlib_data);
+	}
+
+	return rv;
+}
+
+int
+boost_create_simple(const char *outfile, const image_create_args_t *cargs)
+{
+	uint32_t *data = NULL, *image_buf = NULL, *copy_dest = NULL;
+	size_t data_len = 0, image_buf_len = 0;
+	boost_hdr_t *hdr = NULL;
+	int rv = 1;
+
+	if (cargs->use_zlib) {
+		data = zlib_compress((char *)cargs->kernel, cargs->kernel_len, &data_len);
+		if (NULL == data) {
+			fprintf(stderr, "Failed to compress image!\n");
+			goto create_simple_failed;
+		}
+		data_len += 4; /* Unpacked data size field. */
+	} else {
+		data = cargs->kernel;
+		data_len = cargs->kernel_len;
+	}
+
+	image_buf_len = sizeof(boost_hdr_t) + data_len;
+	image_buf = malloc(image_buf_len);
+	if (NULL == image_buf) {
+		fprintf(stderr, "Failed to allocate image buffer\n");
+		goto create_simple_failed;
+	}
+
+	hdr = (boost_hdr_t *)image_buf;
+	copy_dest = (image_buf + sizeof(boost_hdr_t) / 4);
+
+	if (cargs->use_zlib) {
+		memcpy(copy_dest + 1, data, data_len - 4);
+		copy_dest[0] = swap_bytes_be(cargs->kernel_len);
+	} else {
+		memcpy(copy_dest, data, data_len);
+	}
+
+	boost_setup_header(hdr, copy_dest, data_len, cargs);
+
+	if (0 != write_to_file((char *)image_buf, image_buf_len, outfile)) {
+		fprintf(stderr, "Failed to write %s\n", outfile);
+		goto create_simple_failed;
+	}
+
+	rv = 0;
+
+create_simple_failed:
+	if (data && cargs->use_zlib) {
+		free(data);
+		data = NULL;
+	}
+	if (image_buf) {
+		free(image_buf);
+		image_buf = NULL;
 	}
 
 	return rv;
@@ -350,50 +423,53 @@ boost_extract_legacy(const uint32_t *data, size_t len)
 	return 0;
 }
 
-void boost_init_header(boost_hdr_t *hdr, const uint32_t *data, size_t data_len)
+void boost_setup_header(boost_hdr_t *hdr, const uint32_t *data, size_t data_len,
+                        const  image_create_args_t *ic)
 {
 	memset(hdr, 0, sizeof(boost_hdr_t));
 
 	hdr->branch_offset = OFFSET_2_BRANCH(0);
 	hdr->image_size = data_len;
 	hdr->image_checksum = cksum((char *)data, data_len);
-	hdr->load_offset = 0x00208000;
+	hdr->load_offset = ic->load_offset;
 
 	hdr->flags |= BOOST_FLAG_RAM_IMG;
 	hdr->flags |= BOOST_FLAG_NO_HDR;
-	hdr->flags |= BOOST_FLAG_ZLIB;
+
+	if (ic->use_zlib)
+		hdr->flags |= BOOST_FLAG_ZLIB;
 
 	memcpy(&(hdr->platform_id), "nBk2", 4);
 	memcpy(hdr->target_filename, "nBkProOs.img", 12);
-	memcpy(hdr->image_name, "NetBook Pro Linux 3.1", 19);
-	memcpy(hdr->image_version_string, "X001", 5);
+	strncpy(hdr->image_description, ic->image_descr, 64);
+	strncpy(hdr->image_version, ic->image_version, 64);
 
 	hdr->checksum = cksum((const char *)hdr, BOOST_HEADER_CRC_BYTES);
 }
 
-bool boost_is_legacy(const boost_hdr_t *hdr)
+int boost_is_legacy(const boost_hdr_t *hdr)
 {
-	if (0 == strncmp(hdr->image_version_string, "K123m", 5)) {
-		return true;
+	if (0 == strncmp(hdr->image_version, "K123m", 5)) {
+		return 1;
 	} else {
-		return false;
+		return 0;
 	}
 }
 
-bool bcode_check(uint32_t arg)
+int bcode_check(uint32_t arg)
 {
 	int magic = (arg & BCODE_MAGIC_MASK);
 	int version = (arg & BCODE_VERSION_MASK);
 
 	if (magic != BCODE_MAGIC) {
 		printf("Invalid bootcode image!\n");
-		return false;
+		return 0;
 	}
 
 	if (version != 1) {
 		printf("Unsupported bootcode version = %d!\n", version);
-		return false;
+		return 0;
 	}
 
-	return true;
+	return 1;
 }

@@ -36,6 +36,6 @@ uint32_t swap_bytes_be(uint32_t);
 void *zlib_decompress(const char *data, size_t len, size_t *out_len);
 void *zlib_compress(const char *data, size_t len, size_t *out_len);
 int  write_to_file(const char *data, size_t len, const char *filename);
-unsigned cksum(const char *buf, size_t len);
+uint32_t cksum(const char *buf, size_t len);
 
 #endif /* _UTIL_H_ */

@@ -31,7 +31,19 @@
 #define _CONFIG_H_
 
 /* Program version string. */
-#define VERSION_STR "0.1"
+#define VERSION_STR "0.1.99"
+
+/* Default output image name. */
+#define DEFAULT_BOOST_IMG_NAME	"nBkProOs.img"
+
+/* Default description of BooSt image. */
+#define DEFAULT_BOOST_IMG_DESCR	"NetBook Pro OS"
+
+/* Default version string for BooSt image. */
+#define DEFAULT_BOOST_IMG_VER	"X001"
+
+/* Default image memory load offset. */
+#define DEFAULT_IMG_LOAD_OFFSET	0x00208000
 
 /* Maximum possible image size to create/extract. */
 #define MAX_IMAGE_BUF_SIZE	(15*1024*1024)
