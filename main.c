@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <libgen.h>
 #include <errno.h>
 #include <stdio.h>
 
@@ -38,7 +39,7 @@
 
 
 void
-print_help(const char *progname)
+print_help(char *progname)
 {
 	printf("Psion/Teklogix NetBook Pro BooSt image tool, version %s\n"
 	       "Usage: %s [command] [command options]\n\n"
@@ -56,7 +57,7 @@ print_help(const char *progname)
 	       "  -v version, image version string\n"
 	       "  -l offset, memory load offset\n"
 	       "  -z, use zlib compression\n",
-	       VERSION_STR, progname);
+	       VERSION_STR, basename(progname));
 }
 
 int
