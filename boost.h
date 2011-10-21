@@ -60,7 +60,7 @@
 /*
  * First four bytes of the new boot code contain some usefull info.
  * In general it looks like 0xMMMMMVVV, where
- * - AAAAA is the MAGIC number identifying the bootcode.
+ * - MMMMM is the MAGIC number identifying the bootcode.
  * - VVV is the version number.
  */
 #define BCODE_MAGIC 		0xBC0DE000
