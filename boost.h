@@ -47,6 +47,12 @@
 /* Image includes splash screen */
 #define BOOST_FLAG_SPLASH	(1<<17)
 
+/* Image types recognized by BooSt */
+#define BOOST_EXEC_ID           0x0
+#define BOOST_SCRIPT_ID         0x53745342 /* BStS */
+#define BOOST_BOOT_ID           0x544f4f42 /* BOOT */
+#define BOOST_PCON_ID           0x6e6f4350 /* Pcon */
+
 /* Offset at which actual image data begins. */
 #define BOOST_IMAGE_DATA_OFFSET	260
 /* Number of bytes used to calculate header checksum. */

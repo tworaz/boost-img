@@ -63,34 +63,57 @@ boost_print_info(boost_hdr_t hdr)
 	memset(platid_str, 0, 5);
 	memcpy(platid_str, &hdr.platform_id, 4);
 
-	printf("  Platform ID:     %s\n", platid_str);
-	printf("  Target filename: %s\n", hdr.target_filename);
-	printf("  Load offset:     0x%08x\n", hdr.load_offset);
-	printf("  Branch offset:   %u\n", BRANCH_2_OFFSET(hdr.branch_offset));
-	printf("  Mutex bits:      0x%x\n", hdr.mutex_bits);
-	printf("  Header checksum: %u\n", hdr.checksum);
-	printf("  Image:\n");
-	printf("    * ID:          %u\n", hdr.image_id);
-	printf("    * Description: %s\n", hdr.image_description);
-	printf("    * Version:     %s\n", hdr.image_version);
-	printf("    * Size:        %u\n", hdr.image_size);
-	printf("    * Checksum:    %u\n", hdr.image_checksum);
+	printf("  Type:            ");
+	if (hdr.image_id == BOOST_EXEC_ID) {
+		printf("Bootable image\n");
+	} else if (hdr.image_id == BOOST_SCRIPT_ID) {
+		printf("BooSt Script\n");
+	} else if (hdr.image_id == BOOST_BOOT_ID) {
+		printf("BooSt Operating System\n");
+	} else if (hdr.image_id == BOOST_PCON_ID) {
+		printf("Pcon firmware\n");
+	} else {
+		printf("Unknown (0x%x)\n", hdr.image_id);
+	}
 
-	printf("  Flags (0x%08x):\n", hdr.flags);
-	if (hdr.flags & BOOST_FLAG_RAM_IMG)
-		printf("    * RAM image\n");
-	if (hdr.flags & BOOST_FLAG_NO_HDR)
-		printf("    * No header\n");
-	if (hdr.flags & BOOST_FLAG_ERASE)
-		printf("    * Erase before saving\n");
-	if (hdr.flags & BOOST_FLAG_NO_RST)
-		printf("    * No reset before starting\n");
-	if (hdr.flags & BOOST_FLAG_COPY_OS)
-		printf("    * Copy to OS partition\n");
-	if (hdr.flags & BOOST_FLAG_ZLIB)
-		printf("    * Compressed with zlib\n");
-	if (hdr.flags & BOOST_FLAG_SPLASH)
-		printf("    * Has splash\n");
+
+	printf("  Platform:        %s\n", platid_str);
+	printf("  Description:     %s\n", hdr.image_description);
+	printf("  Version:         %s\n", hdr.image_version);
+
+	if (hdr.target_filename[0]) {
+		printf("  Target filename: %s\n", hdr.target_filename);
+	}
+
+	if (hdr.image_id == BOOST_EXEC_ID) {
+		printf("  Load offset:     0x%08x\n", hdr.load_offset);
+		printf("  Branch offset:   %u\n", BRANCH_2_OFFSET(hdr.branch_offset));
+		/*
+		printf("  Mutex bits:      0x%x\n", hdr.mutex_bits);
+		*/
+	}
+
+	printf("  Size:            %u\n", hdr.image_size);
+	printf("  Header CRC:      %u\n", hdr.checksum);
+	printf("  Image CRC:       %u\n", hdr.image_checksum);
+
+	if (hdr.flags) {
+		printf("  Flags:           0x%08x\n", hdr.flags);
+		if (hdr.flags & BOOST_FLAG_RAM_IMG)
+			printf("    * RAM image\n");
+		if (hdr.flags & BOOST_FLAG_NO_HDR)
+			printf("    * No header\n");
+		if (hdr.flags & BOOST_FLAG_ERASE)
+			printf("    * Erase before saving\n");
+		if (hdr.flags & BOOST_FLAG_NO_RST)
+			printf("    * No reset before starting\n");
+		if (hdr.flags & BOOST_FLAG_COPY_OS)
+			printf("    * Copy to OS partition\n");
+		if (hdr.flags & BOOST_FLAG_ZLIB)
+			printf("    * Compressed with zlib\n");
+		if (hdr.flags & BOOST_FLAG_SPLASH)
+			printf("    * Has splash\n");
+	}
 }
 
 int
